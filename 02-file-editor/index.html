@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>File Explorer</title>
+    <style>
+      body {
+        background-color: #222;
+        color: #fff;
+        font-family: Arial, sans-serif;
+      }
+      .menu {
+        background-color: #555;
+        color: #fff;
+        padding: 10px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .menu button,
+      .menu label {
+        background-color: #fff;
+        color: #333;
+        font-size: 16px;
+        padding: 5px 10px;
+        cursor: pointer;
+        border: none;
+      }
+      .menu input[type="text"] {
+        background-color: #333;
+        color: #fff;
+        font-size: 16px;
+        border: 1px solid #444;
+        padding: 5px;
+        width: 200px;
+      }
+      .files {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+      }
+      .file {
+        width: 200px;
+        height: 250px;
+        background-color: #444;
+        color: #fff;
+        text-align: center;
+        padding: 10px;
+        cursor: pointer;
+        transition: background-color 0.2s ease-in-out;
+      }
+      .file:hover {
+        background-color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="menu">
+      <button onclick="goToParent()"><<</button>
+      <span id="currentDirectory"></span>
+      <input
+        type="text"
+        id="newFolder"
+        placeholder="Folder Name"
+        onkeyup="checkNewFolder()"
+      />
+      <button id="createFolder" disabled onclick="createFolder()">
+        Create Folder
+      </button>
+      <input
+        type="file"
+        id="newFile"
+        onchange="uploadFile()"
+        style="display: none"
+      />
+      <label for="newFile">Upload File</label>
+    </div>
+    <div class="files" id="files"></div>
+    <script>
+      const { remote } = require("electron");
+      const { dialog } = remote;
+      const fs = require("fs");
+      const path = require("path");
+
+      let currentDir = process.cwd();
+      showFiles(currentDir);
+
+      function showFiles(dir) {
+        document.getElementById("currentDirectory").innerText =
+          path.basename(dir);
+        document.getElementById("files").innerHTML = "";
+
+        fs.readdir(dir, (err, files) => {
+          if (err) return console.error(err);
+
+          files.forEach((file) => {
+            const filePath = path.join(dir, file);
+            fs.stat(filePath, (err, stats) => {
+              if (err) return console.error(err);
+
+              if (stats.isFile()) {
+                const extname = path.extname(file);
+                const fileSize = (stats.size / 1024 / 1024).toFixed(2);
+                const fileHTML = `
+                <div class="file" onclick="openFile('${filePath}')">
+                  <h3>${path.basename(file)}</h3>
+                  <p>Size: ${fileSize} MB</p>
+                  <p>Ext: ${extname}</p>
+                </div>
+              `;
+                document
+                  .getElementById("files")
+                  .insertAdjacentHTML("beforeend", fileHTML);
+              }
+            });
+          });
+        });
+      }
+
+      function goToParent() {
+        const parentDir = path.join(currentDir, "..");
+        currentDir = parentDir;
+        showFiles(parentDir);
+      }
+
+      function checkNewFolder() {
+        const newFolder = document.getElementById("newFolder").value.trim();
+        document.getElementById("createFolder").disabled = !newFolder;
+      }
+
+      function createFolder() {
+        const newFolder = document.getElementById("newFolder").value.trim();
+        if (!newFolder) {
+          alert("Folder name cannot be empty.");
+          return;
+        }
+
+        const folderPath = path.join(currentDir, newFolder);
+        fs.mkdir(folderPath, { recursive: true }, (err) => {
+          if (err) {
+            console.error("Error creating folder:", err);
+            alert("Failed to create folder.");
+            return;
+          }
+
+          alert(`Folder "${newFolder}" created successfully.`);
+          showFiles(currentDir);
+        });
+      }
+
+      function uploadFile() {
+        const files = dialog.showOpenDialogSync({ properties: ["openFile"] });
+        if (!files || !files.length) return;
+
+        const filePath = files[0];
+        const fileName = path.basename(filePath);
+        fs.copyFileSync(filePath, path.join(currentDir, fileName));
+        showFiles(currentDir);
+      }
+
+      function openFile(filePath) {
+        const fileContent = fs.readFileSync(filePath, "utf-8");
+        document.getElementById("files").innerHTML = `
+        <div class="file">
+          <h3>${path.basename(filePath)}</h3>
+          <textarea style="width: 100%; height: 150px;">${fileContent}</textarea>
+          <button onclick="saveFile('${filePath}')">Save</button>
+        </div>
+      `;
+      }
+
+      function saveFile(filePath) {
+        const fileContent = document.querySelector("textarea").value;
+        fs.writeFileSync(filePath, fileContent);
+        showFiles(currentDir);
+      }
+    </script>
+  </body>
+</html>
