@@ -20,22 +20,29 @@ function createWindow() {
     x,
     y,
     webPreferences: {
+      webviewTag: true,
       nodeIntegration: true,
       contextIsolation: false,
       enableRemoteModule: true
     }
   });
 
-  mainWindow.webContents.on('context-menu', (event, params) => {
-    const menu = new Menu()
-    menu.append(new MenuItem({
-      label: 'Custom Menu Item',
+  // 컨텍스트 메뉴 템플릿
+  const contextMenu = Menu.buildFromTemplate([
+    { label: '복사', role: 'copy' },
+    { label: '붙여넣기', role: 'paste' },
+    { type: 'separator' },  // 구분선
+    { 
+      label: '사용자 정의 동작',
       click: () => {
-        console.log('Custom Menu Item clicked')
+        console.log('사용자 정의 동작 실행')
       }
-    }))
+    }
+  ])
 
-    menu.popup()
+  // 컨텍스트 메뉴 이벤트, 우클릭했을 때 보이는 역할
+  mainWindow.webContents.on('context-menu', (e, params) => {
+    contextMenu.popup()
   })
 
   mainWindow.loadFile("index.html");
